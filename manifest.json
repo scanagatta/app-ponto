@@ -1,0 +1,17 @@
+{
+  "name": "Meu Ponto",
+  "short_name": "Ponto",
+  "description": "Aplicativo offline para registro de ponto.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#bb86fc",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

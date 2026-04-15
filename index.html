@@ -2,11 +2,17 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Meu Ponto Local</title>
+    
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#bb86fc">
+    <link rel="icon" href="./icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="./icon.svg">
+    
     <style>
         :root { --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --primary: #bb86fc; --success: #03dac6; --danger: #cf6679; --nav-bg: #272727; }
-        body { font-family: system-ui, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 0; padding-bottom: 70px; }
+        body { font-family: system-ui, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 0; padding-bottom: 70px; user-select: none; }
         h1, h2 { text-align: center; color: var(--primary); }
         .container { padding: 20px; }
         .card { background: var(--card); padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
@@ -43,8 +49,6 @@
         .modal-overlay { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); align-items: center; justify-content: center; }
         .modal-box { background-color: var(--card); padding: 25px; border-radius: 8px; width: 85%; max-width: 400px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
         .modal-box p { font-size: 18px; margin-bottom: 20px; }
-        
-        /* Estilo para o input de arquivo */
         input[type="file"] { background: #222; padding: 10px; border: 1px dashed var(--primary); border-radius: 6px; cursor: pointer; }
     </style>
 </head>
@@ -61,7 +65,7 @@
                 <div id="status-ponto"></div>
             </div>
             <div class="card">
-                <h2 style="color: #bbb; font-size: 18px;">Esqueceu de bater? (Registro Manual)</h2>
+                <h2 style="color: #bbb; font-size: 18px;">Registro Manual</h2>
                 <input type="datetime-local" id="manual-data-hora">
                 <select id="manual-tipo">
                     <option value="entrada">Entrada</option>
@@ -70,22 +74,21 @@
                 <select id="local-select-manual">
                     <option value="">Selecione o Local...</option>
                 </select>
-                <button class="btn-primary" onclick="baterPontoManual()">Registrar Ponto Manual</button>
+                <button class="btn-primary" onclick="baterPontoManual()">Salvar Ponto Manual</button>
             </div>
         </div>
 
         <div id="tela-historico" class="view">
-            <h1>Histórico de Pontos</h1>
-            
+            <h1>Histórico</h1>
             <div id="area-edicao" class="card" style="display: none; border: 2px solid var(--primary);">
-                <h2>Editando Registro</h2>
+                <h2>Editando</h2>
                 <input type="datetime-local" id="edit-data-hora">
                 <select id="edit-tipo">
                     <option value="entrada">Entrada</option>
                     <option value="saida">Saída</option>
                 </select>
                 <select id="edit-local">
-                    <option value="">Selecione o Local...</option>
+                    <option value="">Selecione...</option>
                 </select>
                 <input type="hidden" id="edit-id">
                 <div class="flex-row">
@@ -93,21 +96,18 @@
                     <button class="btn-danger" onclick="cancelarEdicao()">Cancelar</button>
                 </div>
             </div>
-
-            <div class="card">
-                <div id="lista-historico"></div>
-            </div>
+            <div class="card"><div id="lista-historico"></div></div>
         </div>
 
         <div id="tela-locais" class="view">
-            <h1>Locais de Trabalho</h1>
+            <h1>Locais</h1>
             <div class="card">
                 <h2>Cadastrar Novo</h2>
-                <input type="text" id="novo-local" placeholder="Nome do novo local">
-                <button class="btn-primary" onclick="cadastrarLocal()">Adicionar Local</button>
+                <input type="text" id="novo-local" placeholder="Nome do local">
+                <button class="btn-primary" onclick="cadastrarLocal()">Adicionar</button>
             </div>
             <div class="card">
-                <h2>Locais Cadastrados</h2>
+                <h2>Cadastrados</h2>
                 <ul id="lista-locais" style="padding-left: 20px;"></ul>
             </div>
         </div>
@@ -117,18 +117,15 @@
             <div class="card">
                 <div class="stats-grid" id="stats-container"></div>
             </div>
-            
             <div class="card">
                 <h2>Restaurar Backup</h2>
-                <p style="font-size: 14px; color: #aaa; text-align: center; margin-top: 0;">Selecione um arquivo .json gerado por este app.</p>
-                <input type="file" id="arquivo-importacao">
-                <button class="btn-success" style="padding: 14px;" onclick="importarBackup()">Importar Dados</button>
+                <input type="file" id="arquivo-importacao" accept=".json, application/json">
+                <button class="btn-success" style="padding: 14px;" onclick="importarBackup()">Importar Dados JSON</button>
             </div>
-
             <div class="card">
-                <h2>Dados e Segurança</h2>
-                <button class="btn-primary" onclick="baixarBackupDoMes()">Baixar Backup deste Mês</button>
-                <button class="btn-danger" style="margin-top: 15px;" onclick="limparDados()">Apagar Todos os Dados</button>
+                <h2>Segurança</h2>
+                <button class="btn-primary" onclick="baixarBackupDoMes()">Baixar Backup (Mês Atual)</button>
+                <button class="btn-danger" style="margin-top: 15px;" onclick="limparDados()">Apagar Tudo</button>
             </div>
         </div>
     </div>
@@ -141,7 +138,6 @@
     </nav>
 
     <div id="toast"></div>
-
     <div id="modal-confirm" class="modal-overlay">
         <div class="modal-box">
             <p id="modal-texto"></p>
@@ -155,6 +151,15 @@
     <script>
         let db = JSON.parse(localStorage.getItem('pontoLocalDB')) || { locais: [], registros: [] };
         let acaoConfirmacaoPendente = null;
+
+        // Registrar Service Worker para PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker Registrado!', reg.scope))
+                    .catch(err => console.error('Falha no Service Worker', err));
+            });
+        }
 
         function mostrarToast(mensagem, tipo = 'success') {
             const toast = document.getElementById("toast");
@@ -471,7 +476,7 @@
                         document.getElementById('arquivo-importacao').value = ''; 
                         
                         if(importadosCount === 0) {
-                            mostrarToast("Arquivo lido, mas todos os registros já existiam no app.", "error");
+                            mostrarToast("Arquivo lido, mas todos os registros já existiam.", "error");
                         } else {
                             mostrarToast(`${importadosCount} novos registros importados com sucesso!`);
                         }
@@ -486,7 +491,7 @@
         }
 
         function limparDados() {
-            mostrarConfirm("CUIDADO: Isso vai apagar TODOS os seus registros locais. Tem certeza absoluta?", () => {
+            mostrarConfirm("CUIDADO: Isso vai apagar TODOS os registros. Tem certeza?", () => {
                 localStorage.removeItem('pontoLocalDB');
                 db = { locais: [], registros: [] };
                 atualizarInterface();

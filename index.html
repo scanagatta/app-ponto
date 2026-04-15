@@ -27,20 +27,15 @@
         .stat-item { background: #333; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
         #status-ponto { text-align: center; font-weight: bold; margin-top: 15px; font-size: 18px; }
         
-        /* Controle de Telas */
         .view { display: none; }
         .view.active { display: block; }
 
-        /* Navegação Inferior */
         .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: var(--nav-bg); display: flex; justify-content: space-around; padding: 10px 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.5); z-index: 100; }
         .nav-item { background: none; border: none; color: #888; width: auto; padding: 10px; margin: 0; font-size: 13px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
         .nav-item.active { color: var(--primary); font-weight: bold; }
         
-        .historico-item { border-bottom: 1px solid #333; padding: 15px 0; }
-        .historico-item:last-child { border-bottom: none; }
         .flex-row { display: flex; gap: 10px; }
 
-        /* UI Customizada */
         #toast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 1000; left: 50%; bottom: 80px; transform: translateX(-50%); font-size: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.5); transition: opacity 0.3s; opacity: 0; }
         #toast.show { visibility: visible; opacity: 1; }
         #toast.success { border-left: 5px solid var(--success); }
@@ -80,6 +75,19 @@
 
         <div id="tela-historico" class="view">
             <h1>Histórico</h1>
+            
+            <div class="card" style="padding: 15px; margin-bottom: 15px;">
+                <h3 style="margin-top: 0; font-size: 15px; color: #bbb; margin-bottom: 10px;">Filtrar Exibição</h3>
+                <div class="flex-row">
+                    <select id="filtro-mes" onchange="renderizarHistorico()" style="margin: 0;">
+                        <option value="">Todos os Meses</option>
+                    </select>
+                    <select id="filtro-local" onchange="renderizarHistorico()" style="margin: 0;">
+                        <option value="">Todos os Locais</option>
+                    </select>
+                </div>
+            </div>
+
             <div id="area-edicao" class="card" style="display: none; border: 2px solid var(--primary);">
                 <h2>Editando</h2>
                 <input type="datetime-local" id="edit-data-hora">
@@ -96,7 +104,10 @@
                     <button class="btn-danger" onclick="cancelarEdicao()">Cancelar</button>
                 </div>
             </div>
-            <div class="card"><div id="lista-historico"></div></div>
+
+            <div class="card" style="padding: 10px 20px;">
+                <div id="lista-historico"></div>
+            </div>
         </div>
 
         <div id="tela-locais" class="view">
@@ -113,13 +124,13 @@
         </div>
 
         <div id="tela-resumo" class="view">
-            <h1>Resumo do Mês</h1>
+            <h1>Resumo de Horas</h1>
             <div class="card">
-                <div class="stats-grid" id="stats-container"></div>
+                <div id="stats-container"></div>
             </div>
             <div class="card">
                 <h2>Restaurar Backup</h2>
-                <input type="file" id="arquivo-importacao" accept=".json, application/json">
+                <input type="file" id="arquivo-importacao" accept=".json, application/json, text/plain, application/octet-stream">
                 <button class="btn-success" style="padding: 14px;" onclick="importarBackup()">Importar Dados JSON</button>
             </div>
             <div class="card">
@@ -152,12 +163,9 @@
         let db = JSON.parse(localStorage.getItem('pontoLocalDB')) || { locais: [], registros: [] };
         let acaoConfirmacaoPendente = null;
 
-        // Registrar Service Worker para PWA
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('Service Worker Registrado!', reg.scope))
-                    .catch(err => console.error('Falha no Service Worker', err));
+                navigator.serviceWorker.register('./sw.js').catch(err => console.error(err));
             });
         }
 
@@ -176,7 +184,6 @@
 
         function fecharModal() {
             document.getElementById('modal-confirm').style.display = 'none';
-            acaoConfirmacaoPendente = null;
         }
 
         document.getElementById('btn-modal-sim').addEventListener('click', () => {
@@ -199,27 +206,19 @@
 
         function cadastrarLocal() {
             const nome = document.getElementById('novo-local').value.trim();
-            if (!nome) return mostrarToast("Digite o nome do local!", "error");
-            if (db.locais.includes(nome)) return mostrarToast("Local já cadastrado!", "error");
+            if (!nome) return mostrarToast("Digite o nome!", "error");
+            if (db.locais.includes(nome)) return mostrarToast("Já existe!", "error");
             db.locais.push(nome);
             document.getElementById('novo-local').value = '';
             salvarDB();
-            mostrarToast("Local cadastrado com sucesso!");
         }
 
         function baterPontoNormal() {
             const local = document.getElementById('local-select-normal').value;
-            if (!local) return mostrarToast("Selecione onde você está!", "error");
-
+            if (!local) return mostrarToast("Selecione o local!", "error");
             const agora = Date.now();
             const registrosLocal = db.registros.filter(r => r.local === local);
-            let tipo = 'entrada';
-            
-            if (registrosLocal.length > 0) {
-                const ultimoRegistro = registrosLocal[registrosLocal.length - 1];
-                if (ultimoRegistro.tipo === 'entrada') tipo = 'saida';
-            }
-
+            let tipo = registrosLocal.length > 0 && registrosLocal[registrosLocal.length - 1].tipo === 'entrada' ? 'saida' : 'entrada';
             inserirRegistro(local, tipo, agora);
             mostrarToast(`Ponto de ${tipo} registrado!`);
             if (tipo === 'saida') baixarBackupDoMes();
@@ -229,15 +228,12 @@
             const local = document.getElementById('local-select-manual').value;
             const tipo = document.getElementById('manual-tipo').value;
             const dataHoraRaw = document.getElementById('manual-data-hora').value;
-
-            if (!local || !dataHoraRaw) return mostrarToast("Preencha o local e a data/hora!", "error");
-
-            const timestampManual = new Date(dataHoraRaw).getTime();
-            if (timestampManual > Date.now()) return mostrarToast("Você não pode bater ponto no futuro!", "error");
-
-            inserirRegistro(local, tipo, timestampManual);
-            mostrarToast("Ponto manual registrado com sucesso!");
+            if (!local || !dataHoraRaw) return mostrarToast("Preencha tudo!", "error");
+            const ts = new Date(dataHoraRaw).getTime();
+            if (ts > Date.now()) return mostrarToast("Data futura!", "error");
+            inserirRegistro(local, tipo, ts);
             document.getElementById('manual-data-hora').value = ''; 
+            mostrarToast("Ponto manual salvo!");
         }
 
         function inserirRegistro(local, tipo, timestamp) {
@@ -253,68 +249,98 @@
 
         function exibirUltimoPontoDoDia() {
             const statusDiv = document.getElementById('status-ponto');
-            const dataHojeStr = new Date().toLocaleDateString('pt-BR');
-            const registrosHoje = db.registros.filter(r => r.dataStr === dataHojeStr);
-
-            if (registrosHoje.length > 0) {
-                const ultimo = registrosHoje[registrosHoje.length - 1];
-                const horaFormatada = new Date(ultimo.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
-                statusDiv.innerText = `Último de hoje: ${ultimo.tipo.toUpperCase()} em ${ultimo.local} às ${horaFormatada}`;
-                statusDiv.style.color = ultimo.tipo === 'entrada' ? 'var(--success)' : 'var(--danger)';
+            const hoje = new Date().toLocaleDateString('pt-BR');
+            const hojeRegs = db.registros.filter(r => r.dataStr === hoje);
+            if (hojeRegs.length > 0) {
+                const u = hojeRegs[hojeRegs.length - 1];
+                statusDiv.innerText = `Último: ${u.tipo.toUpperCase()} em ${u.local} às ${new Date(u.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}`;
+                statusDiv.style.color = u.tipo === 'entrada' ? 'var(--success)' : 'var(--danger)';
             } else {
-                statusDiv.innerText = 'Nenhum ponto batido hoje.';
+                statusDiv.innerText = 'Sem pontos hoje.';
                 statusDiv.style.color = '#888';
             }
         }
 
+        // LÓGICA ATUALIZADA DO HISTÓRICO COM AGRUPAMENTO E FILTROS
         function renderizarHistorico() {
             const container = document.getElementById('lista-historico');
-            if (db.registros.length === 0) {
-                container.innerHTML = '<p style="text-align:center; color:#888;">Nenhum registro encontrado.</p>';
+            const filtroMes = document.getElementById('filtro-mes').value;
+            const filtroLocal = document.getElementById('filtro-local').value;
+
+            // 1. Aplica os Filtros
+            let registrosFiltrados = db.registros.filter(r => {
+                let passouMes = true;
+                let passouLocal = true;
+                
+                if (filtroMes !== "") {
+                    const dataReg = new Date(r.timestamp);
+                    const chaveMesAnoReg = `${dataReg.getFullYear()}-${String(dataReg.getMonth()).padStart(2, '0')}`;
+                    passouMes = (chaveMesAnoReg === filtroMes);
+                }
+                
+                if (filtroLocal !== "") {
+                    passouLocal = (r.local === filtroLocal);
+                }
+                
+                return passouMes && passouLocal;
+            });
+
+            if (registrosFiltrados.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:#888; padding: 20px 0;">Nenhum registro encontrado para estes filtros.</p>';
                 return;
             }
 
-            let html = '';
-            const registrosInvertidos = [...db.registros].reverse(); 
+            // 2. Ordena do mais recente pro mais antigo
+            registrosFiltrados.sort((a, b) => b.timestamp - a.timestamp);
 
-            registrosInvertidos.forEach(r => {
-                const dataFormatada = new Date(r.timestamp).toLocaleString('pt-BR', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'});
-                const cor = r.tipo === 'entrada' ? 'var(--success)' : 'var(--danger)';
+            // 3. Extrai apenas os dias únicos na ordem correta
+            const diasOrdenados = [...new Set(registrosFiltrados.map(r => r.dataStr))];
+
+            let html = '';
+
+            // 4. Renderiza agrupado por dia
+            diasOrdenados.forEach(dataStr => {
+                // Cabeçalho do Grupo (O Dia)
+                html += `<div style="background: #333; color: var(--primary); padding: 8px 12px; border-radius: 6px; font-weight: bold; margin: 20px 0 10px 0; font-size: 14px; border-left: 4px solid var(--primary);">📅 ${dataStr}</div>`;
                 
-                html += `
-                <div class="historico-item">
-                    <div style="font-size: 18px;"><strong>${r.local}</strong></div>
-                    <div style="color: ${cor}; font-weight: bold; margin: 4px 0;">${r.tipo.toUpperCase()}</div>
-                    <div style="color: #aaa; margin-bottom: 10px;">${dataFormatada}</div>
-                    <div class="flex-row">
-                        <button class="btn-edit" onclick="iniciarEdicao('${r.id}')">Editar</button>
-                        <button class="btn-danger" onclick="excluirRegistro('${r.id}')">Excluir</button>
-                    </div>
-                </div>`;
+                // Registros correspondentes àquele dia
+                const registrosDoDia = registrosFiltrados.filter(r => r.dataStr === dataStr);
+                
+                registrosDoDia.forEach(r => {
+                    const cor = r.tipo === 'entrada' ? 'var(--success)' : 'var(--danger)';
+                    const horaFormatada = new Date(r.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+                    
+                    html += `
+                    <div style="padding: 12px 0; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-size: 16px; margin-bottom: 4px;"><strong>${r.local}</strong></div>
+                            <div style="color: ${cor}; font-weight: bold; font-size: 13px;">${r.tipo.toUpperCase()} às ${horaFormatada}</div>
+                        </div>
+                        <div class="flex-row" style="gap: 8px;">
+                            <button class="btn-edit" style="padding: 8px 12px; font-size: 13px; margin: 0; width: auto;" onclick="iniciarEdicao('${r.id}')">Editar</button>
+                            <button class="btn-danger" style="padding: 8px 12px; font-size: 13px; margin: 0; width: auto;" onclick="excluirRegistro('${r.id}')">Excluir</button>
+                        </div>
+                    </div>`;
+                });
             });
+
             container.innerHTML = html;
         }
 
         function excluirRegistro(id) {
-            mostrarConfirm("Tem certeza que deseja excluir este registro? Essa ação não pode ser desfeita.", () => {
+            mostrarConfirm("Excluir registro?", () => {
                 db.registros = db.registros.filter(r => r.id !== id);
                 salvarDB();
-                mostrarToast("Registro excluído com sucesso!");
             });
         }
 
         function iniciarEdicao(id) {
             const r = db.registros.find(x => x.id === id);
             if(!r) return;
-
             document.getElementById('edit-id').value = r.id;
             document.getElementById('edit-local').value = r.local;
             document.getElementById('edit-tipo').value = r.tipo;
-            
-            const tzOffset = new Date().getTimezoneOffset() * 60000; 
-            const localISOTime = (new Date(r.timestamp - tzOffset)).toISOString().slice(0, 16);
-            document.getElementById('edit-data-hora').value = localISOTime;
-
+            document.getElementById('edit-data-hora').value = (new Date(r.timestamp - new Date().getTimezoneOffset()*60000)).toISOString().slice(0, 16);
             document.getElementById('area-edicao').style.display = 'block';
             window.scrollTo(0, 0); 
         }
@@ -322,32 +348,52 @@
         function salvarEdicao() {
             const id = document.getElementById('edit-id').value;
             const idx = db.registros.findIndex(x => x.id === id);
-            if(idx === -1) return;
-
+            const raw = document.getElementById('edit-data-hora').value;
             db.registros[idx].local = document.getElementById('edit-local').value;
             db.registros[idx].tipo = document.getElementById('edit-tipo').value;
-            
-            const rawDate = document.getElementById('edit-data-hora').value;
-            db.registros[idx].timestamp = new Date(rawDate).getTime();
-            db.registros[idx].dataStr = new Date(rawDate).toLocaleDateString('pt-BR');
-
+            db.registros[idx].timestamp = new Date(raw).getTime();
+            db.registros[idx].dataStr = new Date(raw).toLocaleDateString('pt-BR');
             salvarDB();
-            cancelarEdicao();
-            mostrarToast("Registro atualizado com sucesso!");
-        }
-
-        function cancelarEdicao() {
             document.getElementById('area-edicao').style.display = 'none';
         }
 
+        function cancelarEdicao() { document.getElementById('area-edicao').style.display = 'none'; }
+
+        // LÓGICA ATUALIZADA DOS FILTROS E INTERFACE
         function atualizarInterface() {
-            const optionsHTML = '<option value="">Selecione o Local...</option>' + 
-                                db.locais.map(l => `<option value="${l}">${l}</option>`).join('');
+            const options = '<option value="">Selecione o Local...</option>' + db.locais.map(l => `<option value="${l}">${l}</option>`).join('');
+            document.getElementById('local-select-normal').innerHTML = options;
+            document.getElementById('local-select-manual').innerHTML = options;
+            document.getElementById('edit-local').innerHTML = options;
+            document.getElementById('lista-locais').innerHTML = db.locais.map(l => `<li>${l}</li>`).join('');
+
+            // Popula os Filtros da Tela de Histórico
+            const optionsFiltroLocal = '<option value="">Todos os Locais</option>' + db.locais.map(l => `<option value="${l}">${l}</option>`).join('');
             
-            document.getElementById('local-select-normal').innerHTML = optionsHTML;
-            document.getElementById('local-select-manual').innerHTML = optionsHTML;
-            document.getElementById('edit-local').innerHTML = optionsHTML;
-            document.getElementById('lista-locais').innerHTML = db.locais.map(l => `<li style="margin-bottom: 10px;">${l}</li>`).join('');
+            // Lógica inteligente para o filtro de meses (busca apenas os meses existentes no DB)
+            const mesesDisponiveis = new Set();
+            db.registros.forEach(r => {
+                const d = new Date(r.timestamp);
+                mesesDisponiveis.add(`${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`);
+            });
+            const mesesOrdenados = Array.from(mesesDisponiveis).sort().reverse();
+            const mesesNomes = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+            
+            let optionsFiltroMes = '<option value="">Todos os Meses</option>';
+            mesesOrdenados.forEach(ma => {
+                const [ano, mes] = ma.split('-');
+                optionsFiltroMes += `<option value="${ma}">${mesesNomes[parseInt(mes)]} de ${ano}</option>`;
+            });
+
+            // Preserva as seleções atuais dos filtros se existirem
+            const selecaoMesAnterior = document.getElementById('filtro-mes').value;
+            const selecaoLocalAnterior = document.getElementById('filtro-local').value;
+
+            document.getElementById('filtro-mes').innerHTML = optionsFiltroMes;
+            document.getElementById('filtro-local').innerHTML = optionsFiltroLocal;
+
+            document.getElementById('filtro-mes').value = selecaoMesAnterior;
+            document.getElementById('filtro-local').value = selecaoLocalAnterior;
 
             renderizarHistorico();
             calcularEstatisticasMes();
@@ -355,151 +401,83 @@
         }
 
         function calcularEstatisticasMes() {
-            const statsContainer = document.getElementById('stats-container');
-            statsContainer.innerHTML = '';
+            const container = document.getElementById('stats-container');
+            container.innerHTML = '';
+            const agora = new Date();
+            const periodos = [
+                { label: "Mês Atual", data: agora },
+                { label: "Mês Anterior", data: new Date(agora.getFullYear(), agora.getMonth() - 1, 1) }
+            ];
 
-            const dataAtual = new Date();
-            const mesAtual = dataAtual.getMonth();
-            const anoAtual = dataAtual.getFullYear();
+            periodos.forEach(p => {
+                const mes = p.data.getMonth();
+                const ano = p.data.getFullYear();
+                const nomeMes = p.data.toLocaleString('pt-BR', { month: 'long' });
+                let html = `<h3 style="color:var(--primary);margin:20px 0 10px;border-bottom:1px solid #333;padding-bottom:5px;font-size:16px">${p.label} (${nomeMes}/${ano})</h3>`;
+                let temDados = false;
 
-            db.locais.forEach(local => {
-                const registros = db.registros.filter(r => {
-                    const data = new Date(r.timestamp);
-                    return r.local === local && data.getMonth() === mesAtual && data.getFullYear() === anoAtual;
-                });
-
-                let totalMilissegundos = 0;
-                let diasTrabalhados = new Set();
-                let ultimaEntrada = null;
-
-                registros.forEach(r => {
-                    diasTrabalhados.add(r.dataStr);
-                    if (r.tipo === 'entrada') {
-                        ultimaEntrada = r.timestamp;
-                    } else if (r.tipo === 'saida' && ultimaEntrada) {
-                        totalMilissegundos += (r.timestamp - ultimaEntrada);
-                        ultimaEntrada = null;
+                db.locais.forEach(local => {
+                    const regs = db.registros.filter(r => {
+                        const d = new Date(r.timestamp);
+                        return r.local === local && d.getMonth() === mes && d.getFullYear() === ano;
+                    });
+                    if (regs.length > 0) {
+                        temDados = true;
+                        let ms = 0, entrada = null, dias = new Set();
+                        regs.forEach(r => {
+                            dias.add(r.dataStr);
+                            if (r.tipo === 'entrada') entrada = r.timestamp;
+                            else if (entrada) { ms += (r.timestamp - entrada); entrada = null; }
+                        });
+                        const mins = Math.floor(ms / 60000);
+                        html += `<div class="stat-item" style="margin-bottom:8px">
+                            <span><strong>${local}</strong><br>${dias.size} dias</span>
+                            <span style="color:var(--primary);font-size:18px"><strong>${Math.floor(mins/60)}h ${(mins%60).toString().padStart(2,'0')}m</strong></span>
+                        </div>`;
                     }
                 });
-
-                const minutosTotais = Math.floor(totalMilissegundos / (1000 * 60));
-                const horas = Math.floor(minutosTotais / 60);
-                const minutos = minutosTotais % 60;
-                const minutosFormatados = minutos.toString().padStart(2, '0');
-                const tempoExibicao = `${horas}h ${minutosFormatados}m`;
-
-                if (registros.length > 0) {
-                    statsContainer.innerHTML += `
-                        <div class="stat-item">
-                            <span><strong>${local}</strong><br>${diasTrabalhados.size} dias trabalhados</span>
-                            <span style="text-align: right; color: var(--primary); font-size: 18px;"><strong>${tempoExibicao}</strong></span>
-                        </div>
-                    `;
-                }
+                container.innerHTML += temDados ? html : html + '<p style="color:#888;text-align:center;font-size:14px">Sem registros neste período.</p>';
             });
-
-            if (statsContainer.innerHTML === '') {
-                statsContainer.innerHTML = '<p style="text-align:center; color:#888;">Nenhum dado neste mês.</p>';
-            }
         }
 
         function baixarBackupDoMes() {
-            const dataAtual = new Date();
-            const anoAtual = dataAtual.getFullYear();
-            const mesAtual = dataAtual.getMonth();
-            
-            const registrosDoMes = db.registros.filter(r => {
-                const dataRegistro = new Date(r.timestamp);
-                return dataRegistro.getMonth() === mesAtual && dataRegistro.getFullYear() === anoAtual;
-            });
-
-            if(registrosDoMes.length === 0) {
-                mostrarToast("Não há registros neste mês para baixar.", "error");
-                return;
-            }
-
-            const dadosExportacao = { mes: mesAtual + 1, ano: anoAtual, locais_ativos: db.locais, registros: registrosDoMes };
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dadosExportacao, null, 2));
-            const dlAnchorElem = document.createElement('a');
-            dlAnchorElem.setAttribute("href", dataStr);
-            
-            const nomeMes = String(mesAtual + 1).padStart(2, '0');
-            const dia = String(dataAtual.getDate()).padStart(2, '0');
-            const hora = String(dataAtual.getHours()).padStart(2, '0');
-            const minuto = String(dataAtual.getMinutes()).padStart(2, '0');
-            
-            dlAnchorElem.setAttribute("download", `backup_ponto_${anoAtual}_${nomeMes}_${dia}_${hora}h${minuto}.json`);
-            document.body.appendChild(dlAnchorElem);
-            dlAnchorElem.click();
-            document.body.removeChild(dlAnchorElem);
-            mostrarToast("Backup mensal baixado com sucesso!");
+            const d = new Date();
+            const mes = d.getMonth(), ano = d.getFullYear();
+            const regs = db.registros.filter(r => { const dr = new Date(r.timestamp); return dr.getMonth() === mes && dr.getFullYear() === ano; });
+            const blob = new Blob([JSON.stringify({ mes: mes+1, ano, locais: db.locais, registros: regs }, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `backup_${ano}_${String(mes+1).padStart(2,'0')}_${d.getDate()}_${d.getHours()}h${d.getMinutes()}.json`;
+            a.click();
+            mostrarToast("Backup baixado!");
         }
 
         function importarBackup() {
-            const input = document.getElementById('arquivo-importacao');
-            if (input.files.length === 0) {
-                mostrarToast("Por favor, selecione um arquivo JSON.", "error");
-                return;
-            }
-
-            const file = input.files[0];
+            const f = document.getElementById('arquivo-importacao').files[0];
+            if (!f) return mostrarToast("Selecione um arquivo!", "error");
             const reader = new FileReader();
-
-            reader.onload = function(e) {
+            reader.onload = (e) => {
                 try {
-                    const dados = JSON.parse(e.target.result);
-                    
-                    const registrosImportados = dados.registros || [];
-                    const locaisImportados = dados.locais || dados.locais_ativos || [];
-
-                    if (!Array.isArray(registrosImportados) || !Array.isArray(locaisImportados)) {
-                        throw new Error("Formato de arquivo irreconhecível");
-                    }
-
-                    mostrarConfirm(`O arquivo contém ${registrosImportados.length} registros. Deseja incorporar esses dados ao aplicativo?`, () => {
-                        let importadosCount = 0;
-
-                        locaisImportados.forEach(loc => {
-                            if (!db.locais.includes(loc)) db.locais.push(loc);
-                        });
-
-                        const idsExistentes = new Set(db.registros.map(r => r.id));
-                        
-                        registrosImportados.forEach(reg => {
-                            if (!idsExistentes.has(reg.id)) {
-                                db.registros.push(reg);
-                                importadosCount++;
-                            }
-                        });
-
+                    const d = JSON.parse(e.target.result);
+                    const regs = d.registros || [];
+                    mostrarConfirm(`Importar ${regs.length} registros?`, () => {
+                        let novos = 0;
+                        (d.locais || d.locais_ativos || []).forEach(l => { if(!db.locais.includes(l)) db.locais.push(l); });
+                        const ids = new Set(db.registros.map(r => r.id));
+                        regs.forEach(r => { if(!ids.has(r.id)) { db.registros.push(r); novos++; } });
                         salvarDB();
-                        document.getElementById('arquivo-importacao').value = ''; 
-                        
-                        if(importadosCount === 0) {
-                            mostrarToast("Arquivo lido, mas todos os registros já existiam.", "error");
-                        } else {
-                            mostrarToast(`${importadosCount} novos registros importados com sucesso!`);
-                        }
+                        mostrarToast(`${novos} novos registros!`);
                     });
-
-                } catch (err) {
-                    mostrarToast("Arquivo inválido. Tem certeza que é o JSON correto?", "error");
-                    console.error(err);
-                }
+                } catch { mostrarToast("Erro no arquivo!", "error"); }
             };
-            reader.readAsText(file);
+            reader.readAsText(f);
         }
 
         function limparDados() {
-            mostrarConfirm("CUIDADO: Isso vai apagar TODOS os registros. Tem certeza?", () => {
-                localStorage.removeItem('pontoLocalDB');
-                db = { locais: [], registros: [] };
-                atualizarInterface();
-                mostrarToast("Todos os dados foram apagados.", "error");
-            });
+            mostrarConfirm("Apagar TUDO?", () => { localStorage.removeItem('pontoLocalDB'); db = { locais: [], registros: [] }; atualizarInterface(); });
         }
 
-        // Start
         atualizarInterface();
     </script>
 </body>

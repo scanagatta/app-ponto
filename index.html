@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" href="./icon.svg">
     
     <style>
-        :root { --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --primary: #bb86fc; --success: #03dac6; --danger: #cf6679; --nav-bg: #272727; }
+        :root { --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --primary: #bb86fc; --success: #03dac6; --danger: #cf6679; --nav-bg: #272727; --disabled: #555; }
         body { font-family: system-ui, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 0; padding-bottom: 70px; user-select: none; }
         h1, h2 { text-align: center; color: var(--primary); }
         .container { padding: 20px; }
@@ -21,7 +21,8 @@
         button { font-weight: bold; cursor: pointer; transition: 0.2s; }
         .btn-primary { background: var(--primary); color: #000; }
         .btn-success { background: var(--success); color: #000; font-size: 18px; padding: 20px; }
-        .btn-danger { background: var(--danger); color: #000; }
+        .btn-danger { background: var(--danger); color: #000; font-size: 18px; padding: 20px; }
+        .btn-disabled { background: var(--disabled); color: #aaa; font-size: 18px; padding: 20px; cursor: not-allowed; }
         .btn-edit { background: #444; color: white; }
         .stats-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
         .stat-item { background: #333; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
@@ -53,10 +54,10 @@
         <div id="tela-ponto" class="view active">
             <h1>Relógio de Ponto</h1>
             <div class="card">
-                <select id="local-select-normal">
+                <select id="local-select-normal" onchange="atualizarBotaoPonto()">
                     <option value="">Onde você está agora?</option>
                 </select>
-                <button class="btn-success" onclick="baterPontoNormal()">Bater Ponto AGORA</button>
+                <button id="btn-bater-ponto" class="btn-disabled" onclick="baterPontoNormal()">Selecione um Local</button>
                 <div id="status-ponto"></div>
             </div>
             <div class="card">
@@ -75,7 +76,6 @@
 
         <div id="tela-historico" class="view">
             <h1>Histórico</h1>
-            
             <div class="card" style="padding: 15px; margin-bottom: 15px;">
                 <h3 style="margin-top: 0; font-size: 15px; color: #bbb; margin-bottom: 10px;">Filtrar Exibição</h3>
                 <div class="flex-row">
@@ -101,7 +101,7 @@
                 <input type="hidden" id="edit-id">
                 <div class="flex-row">
                     <button class="btn-primary" onclick="salvarEdicao()">Salvar</button>
-                    <button class="btn-danger" onclick="cancelarEdicao()">Cancelar</button>
+                    <button class="btn-danger" style="margin-top:8px" onclick="cancelarEdicao()">Cancelar</button>
                 </div>
             </div>
 
@@ -204,6 +204,36 @@
             atualizarInterface();
         }
 
+        // --- NOVA LÓGICA DO BOTÃO DINÂMICO ---
+        function atualizarBotaoPonto() {
+            const local = document.getElementById('local-select-normal').value;
+            const btn = document.getElementById('btn-bater-ponto');
+
+            if (!local) {
+                btn.className = 'btn-disabled';
+                btn.innerText = 'Selecione um Local';
+                return;
+            }
+
+            const registrosLocal = db.registros.filter(r => r.local === local);
+            let proximoTipo = 'entrada';
+            
+            if (registrosLocal.length > 0) {
+                const ultimoRegistro = registrosLocal[registrosLocal.length - 1];
+                if (ultimoRegistro.tipo === 'entrada') {
+                    proximoTipo = 'saida';
+                }
+            }
+
+            if (proximoTipo === 'entrada') {
+                btn.className = 'btn-success';
+                btn.innerText = 'Bater ENTRADA';
+            } else {
+                btn.className = 'btn-danger';
+                btn.innerText = 'Bater SAÍDA';
+            }
+        }
+
         function cadastrarLocal() {
             const nome = document.getElementById('novo-local').value.trim();
             if (!nome) return mostrarToast("Digite o nome!", "error");
@@ -215,12 +245,14 @@
 
         function baterPontoNormal() {
             const local = document.getElementById('local-select-normal').value;
-            if (!local) return mostrarToast("Selecione o local!", "error");
+            if (!local) return mostrarToast("Selecione o local primeiro!", "error");
+            
             const agora = Date.now();
             const registrosLocal = db.registros.filter(r => r.local === local);
             let tipo = registrosLocal.length > 0 && registrosLocal[registrosLocal.length - 1].tipo === 'entrada' ? 'saida' : 'entrada';
+            
             inserirRegistro(local, tipo, agora);
-            mostrarToast(`Ponto de ${tipo} registrado!`);
+            mostrarToast(`Ponto de ${tipo.toUpperCase()} registrado!`);
             if (tipo === 'saida') baixarBackupDoMes();
         }
 
@@ -253,7 +285,7 @@
             const hojeRegs = db.registros.filter(r => r.dataStr === hoje);
             if (hojeRegs.length > 0) {
                 const u = hojeRegs[hojeRegs.length - 1];
-                statusDiv.innerText = `Último: ${u.tipo.toUpperCase()} em ${u.local} às ${new Date(u.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}`;
+                statusDiv.innerText = `Último de hoje: ${u.tipo.toUpperCase()} em ${u.local} às ${new Date(u.timestamp).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}`;
                 statusDiv.style.color = u.tipo === 'entrada' ? 'var(--success)' : 'var(--danger)';
             } else {
                 statusDiv.innerText = 'Sem pontos hoje.';
@@ -261,49 +293,32 @@
             }
         }
 
-        // LÓGICA ATUALIZADA DO HISTÓRICO COM AGRUPAMENTO E FILTROS
         function renderizarHistorico() {
             const container = document.getElementById('lista-historico');
             const filtroMes = document.getElementById('filtro-mes').value;
             const filtroLocal = document.getElementById('filtro-local').value;
 
-            // 1. Aplica os Filtros
             let registrosFiltrados = db.registros.filter(r => {
-                let passouMes = true;
-                let passouLocal = true;
-                
+                let passouMes = true, passouLocal = true;
                 if (filtroMes !== "") {
                     const dataReg = new Date(r.timestamp);
-                    const chaveMesAnoReg = `${dataReg.getFullYear()}-${String(dataReg.getMonth()).padStart(2, '0')}`;
-                    passouMes = (chaveMesAnoReg === filtroMes);
+                    passouMes = (`${dataReg.getFullYear()}-${String(dataReg.getMonth()).padStart(2, '0')}` === filtroMes);
                 }
-                
-                if (filtroLocal !== "") {
-                    passouLocal = (r.local === filtroLocal);
-                }
-                
+                if (filtroLocal !== "") passouLocal = (r.local === filtroLocal);
                 return passouMes && passouLocal;
             });
 
             if (registrosFiltrados.length === 0) {
-                container.innerHTML = '<p style="text-align:center; color:#888; padding: 20px 0;">Nenhum registro encontrado para estes filtros.</p>';
+                container.innerHTML = '<p style="text-align:center; color:#888; padding: 20px 0;">Nenhum registro encontrado.</p>';
                 return;
             }
 
-            // 2. Ordena do mais recente pro mais antigo
             registrosFiltrados.sort((a, b) => b.timestamp - a.timestamp);
-
-            // 3. Extrai apenas os dias únicos na ordem correta
             const diasOrdenados = [...new Set(registrosFiltrados.map(r => r.dataStr))];
-
             let html = '';
 
-            // 4. Renderiza agrupado por dia
             diasOrdenados.forEach(dataStr => {
-                // Cabeçalho do Grupo (O Dia)
                 html += `<div style="background: #333; color: var(--primary); padding: 8px 12px; border-radius: 6px; font-weight: bold; margin: 20px 0 10px 0; font-size: 14px; border-left: 4px solid var(--primary);">📅 ${dataStr}</div>`;
-                
-                // Registros correspondentes àquele dia
                 const registrosDoDia = registrosFiltrados.filter(r => r.dataStr === dataStr);
                 
                 registrosDoDia.forEach(r => {
@@ -323,7 +338,6 @@
                     </div>`;
                 });
             });
-
             container.innerHTML = html;
         }
 
@@ -359,18 +373,31 @@
 
         function cancelarEdicao() { document.getElementById('area-edicao').style.display = 'none'; }
 
-        // LÓGICA ATUALIZADA DOS FILTROS E INTERFACE
         function atualizarInterface() {
+            // Salva as seleções atuais antes de reconstruir os selects
+            const selNormal = document.getElementById('local-select-normal');
+            const selManual = document.getElementById('local-select-manual');
+            const selEdit = document.getElementById('edit-local');
+            
+            const valNormal = selNormal.value;
+            const valManual = selManual.value;
+            const valEdit = selEdit.value;
+
             const options = '<option value="">Selecione o Local...</option>' + db.locais.map(l => `<option value="${l}">${l}</option>`).join('');
-            document.getElementById('local-select-normal').innerHTML = options;
-            document.getElementById('local-select-manual').innerHTML = options;
-            document.getElementById('edit-local').innerHTML = options;
+            
+            selNormal.innerHTML = options;
+            selManual.innerHTML = options;
+            selEdit.innerHTML = options;
+
+            // Restaura as seleções
+            selNormal.value = valNormal;
+            selManual.value = valManual;
+            selEdit.value = valEdit;
+
             document.getElementById('lista-locais').innerHTML = db.locais.map(l => `<li>${l}</li>`).join('');
 
-            // Popula os Filtros da Tela de Histórico
+            // Filtros Histórico
             const optionsFiltroLocal = '<option value="">Todos os Locais</option>' + db.locais.map(l => `<option value="${l}">${l}</option>`).join('');
-            
-            // Lógica inteligente para o filtro de meses (busca apenas os meses existentes no DB)
             const mesesDisponiveis = new Set();
             db.registros.forEach(r => {
                 const d = new Date(r.timestamp);
@@ -385,19 +412,21 @@
                 optionsFiltroMes += `<option value="${ma}">${mesesNomes[parseInt(mes)]} de ${ano}</option>`;
             });
 
-            // Preserva as seleções atuais dos filtros se existirem
-            const selecaoMesAnterior = document.getElementById('filtro-mes').value;
-            const selecaoLocalAnterior = document.getElementById('filtro-local').value;
+            const selFiltroMes = document.getElementById('filtro-mes');
+            const selFiltroLocal = document.getElementById('filtro-local');
+            const valFiltroMes = selFiltroMes.value;
+            const valFiltroLocal = selFiltroLocal.value;
 
-            document.getElementById('filtro-mes').innerHTML = optionsFiltroMes;
-            document.getElementById('filtro-local').innerHTML = optionsFiltroLocal;
-
-            document.getElementById('filtro-mes').value = selecaoMesAnterior;
-            document.getElementById('filtro-local').value = selecaoLocalAnterior;
+            selFiltroMes.innerHTML = optionsFiltroMes;
+            selFiltroLocal.innerHTML = optionsFiltroLocal;
+            
+            selFiltroMes.value = valFiltroMes;
+            selFiltroLocal.value = valFiltroLocal;
 
             renderizarHistorico();
             calcularEstatisticasMes();
             exibirUltimoPontoDoDia(); 
+            atualizarBotaoPonto(); // <- Força a atualização do visual do botão
         }
 
         function calcularEstatisticasMes() {
